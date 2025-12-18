@@ -1,0 +1,7 @@
+{
+  "name": "AI Note Taker",
+  "description": "A smart voice recorder that converts audio into structured notes, summaries, and action items using Gemini.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

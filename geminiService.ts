@@ -1,31 +1,30 @@
-
-// Use gemini-3-flash-preview for optimized audio processing and summarization
 import { GoogleGenAI, Type } from "@google/genai";
 import { ProcessingResponse } from "./types";
 
+// This tells TypeScript that "process" exists globally, fixing the Netlify build error
+declare var process: {
+  env: {
+    API_KEY: string;
+  };
+};
+
 const SYSTEM_INSTRUCTION = `
 You are an expert executive assistant and professional note-taker. 
-Your task is to listen to the provided audio (which could be a meeting, a lecture, a voice memo, or a conversation) and generate a highly structured set of notes.
+Your task is to listen to the provided audio and generate highly structured notes.
 
 You must output JSON matching this schema:
 {
-  "title": "A short, relevant title for the note",
-  "summary": "A concise paragraph summarizing the main purpose and content.",
-  "keyPoints": ["Array of strings, each being a key bullet point."],
+  "title": "A short, relevant title",
+  "summary": "A concise summary paragraph.",
+  "keyPoints": ["Bullet points of key information."],
   "actionItems": [
-    { "task": "The specific task to be done", "assignee": "Name of person responsible, or 'Team'/'Unassigned'" }
+    { "task": "The specific task", "assignee": "Name of person or 'Unassigned'" }
   ],
-  "transcript": "A clean, readable transcript of the audio.",
-  "category": "One word category: Meeting, Idea, Lecture, Personal, or Other"
+  "transcript": "A clean transcript.",
+  "category": "Meeting, Idea, Lecture, Personal, or Other"
 }
 
-CRITICAL INSTRUCTION FOR ACTION ITEMS:
-- Listen carefully for who is assigned to a task (e.g., "John will handle the report" -> assignee: "John").
-- If 'I' or 'me' is used, infer the speaker if possible, or use "Speaker".
-- If no specific person is mentioned, use "Unassigned".
-
-Ensure the transcript is accurate but cleans up stuttering or filler words slightly for readability.
-If no specific action items are found, return an empty array for that field.
+CRITICAL: For action items, identify who is supposed to do what. If no name is mentioned, use "Unassigned".
 `;
 
 export const processAudioWithGemini = async (
@@ -33,25 +32,15 @@ export const processAudioWithGemini = async (
   mimeType: string
 ): Promise<ProcessingResponse> => {
   try {
-    // Create new GoogleGenAI instance before the call to ensure fresh API key context
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    // Updated to gemini-3-flash-preview for latest reasoning capabilities
     const modelId = "gemini-3-flash-preview";
 
     const response = await ai.models.generateContent({
       model: modelId,
       contents: {
         parts: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: audioBase64,
-            },
-          },
-          {
-            text: "Listen to this audio and generate structured notes.",
-          },
+          { inlineData: { mimeType: mimeType, data: audioBase64 } },
+          { text: "Generate structured notes from this audio." },
         ],
       },
       config: {
@@ -62,10 +51,7 @@ export const processAudioWithGemini = async (
           properties: {
             title: { type: Type.STRING },
             summary: { type: Type.STRING },
-            keyPoints: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
+            keyPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
             actionItems: {
               type: Type.ARRAY,
               items: { 
@@ -87,10 +73,9 @@ export const processAudioWithGemini = async (
 
     const text = response.text;
     if (!text) throw new Error("No response from Gemini");
-
     return JSON.parse(text) as ProcessingResponse;
   } catch (error) {
-    console.error("Gemini Processing Error:", error);
+    console.error("Gemini Error:", error);
     throw error;
   }
 };
